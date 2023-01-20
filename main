@@ -1,0 +1,248 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © VictorWedden
+
+//@version=5
+indicator(title = 'MACD Divergence Indicator', max_bars_back=500)
+
+
+//User Input
+
+
+
+int fast_Ema_Len = input.int(defval=12, title='Fast EMA Length: ', minval=0, maxval=60)  //Lookback for Fast EMA
+int slow_Ema_Len = input.int(defval=26, title='Slow EMA Length: ', minval=0, maxval=60)  //Lookback for Slow EMA
+int signal_Ema_Len = input.int(defval=9, title='Signal EMA Length: ', minval=0, maxval=60)  //Lookback for Signal EMA
+
+
+
+//Calculate MACD Values
+
+
+
+float fast_Ema = ta.ema(close, fast_Ema_Len)  //Fast EMA Container
+float slow_Ema = ta.ema(close, slow_Ema_Len)  //Slow EMA Container
+float macd = fast_Ema - slow_Ema  //MACD Value Container
+float signal_Ema = ta.ema(macd, signal_Ema_Len)  //Signal EMA Container
+float macd_Histogram = macd - signal_Ema  //MACD Histogram Container
+
+
+
+//Plot MACD Histogram
+
+
+
+color histogram_Color = macd_Histogram > 0 ? macd_Histogram[0] < macd_Histogram[1] ? color.lime : color.green : macd_Histogram < 0 ? macd_Histogram[0] > macd_Histogram[1] ? color.red : color.maroon : color.gray  //Decides MACD Hisogram color whether positive/negative and decreasing/increasing 
+
+plot(macd_Histogram, title='MACD Histogram: ', color=histogram_Color, linewidth = 2, style=plot.style_histogram)  //Plots MACD Histogram
+
+                                                                                                    //Divergence Detection
+
+//MACD Min/Max Index Initialization
+
+
+
+var curr_MACD_Max_Idx = 0  //Current Crossover MACD Histogram Max Location Container
+var prev_MACD_Max_Idx = 0  //Previous Crossover MACD Histogram Max Location Container
+var curr_MACD_Min_Idx = 0  //Current Crossover MACD Histogram Min Location Container
+var prev_MACD_Min_Idx = 0  //Previous Crossover MACD Histogram Min Location Container
+
+
+//MACD Histogram / Price and Max/Min Initialization
+
+
+
+var curr_MACD_Max = 0.0  //Current Crossover MACD Histogram Max Value Container
+var prev_MACD_Max = 0.0  //Previous Crossover MACD Histogram Max Value Container
+var curr_MACD_Min = 0.0  //Current Crossover MACD Histogram Min Value Container
+var prev_MACD_Min = 0.0  //Previous Crossover MACD Histogram Min Value Container
+
+var curr_Price_Max = 0.0  //Current Crossover Price Max Container
+var prev_Price_Max = 0.0  //Previous Crossover Price Max Container
+var curr_Price_Min = 0.0  //Current Crossover Price Min Conatiner
+var prev_Price_Min = 0.0  //Previous Crossover PRice Min Container
+
+
+
+//Divergence Line Intialization
+
+
+
+var line div_Preg = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)        //Regular Bearish Divergence Line Container
+var line div_Phid = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)        //Hidden Bearish Divergence Line Container
+var line div_Nreg = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)        //Regular Bullish Divergence Line Container
+var line div_Nhid = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)        //Hidden Bullish Divergence Line Container
+var line div_Preg_Prev = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)   //Regular Bearish Divergence Line Container
+var line div_Phid_Prev = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)   //Hidden Bearish Divergence Line Container
+var line div_Nreg_Prev = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)   //Regular Bullish Divergence Line Container
+var line div_Nhid_Prev = line.new(x1 = bar_index[0], y1 = 0.001, x2 = bar_index[0], y2 = 0.001)   //Hidden Bullish Divergence Line Container
+
+
+
+//Bars Pos/Neg Counter Initialization
+
+
+
+var bars_Pos = 0
+var bars_Neg = 0
+
+
+
+//MACD Tests
+
+
+
+if macd_Histogram > 0    //MACD Positive
+
+    //Reset positive bar count
+    if bars_Pos < 1
+        prev_MACD_Min_Idx := curr_MACD_Min_Idx
+        
+    //Reset min price
+    prev_Price_Min := curr_Price_Min
+
+    //Update bar totals
+    bars_Neg := 0
+    bars_Pos += 1
+
+    //Update maxes
+    curr_MACD_Max := ta.highest(macd_Histogram, bars_Pos)
+    curr_Price_Max := ta.highest(high, bars_Pos)
+
+    //Check if max and update max index
+    if ta.highest(macd_Histogram[0], bars_Pos) > ta.highest(macd_Histogram[1], bars_Pos)
+
+        curr_MACD_Max_Idx := 0
+        
+    else if ta.highest(macd_Histogram[0], bars_Pos) < ta.highest(macd_Histogram[1], bars_Pos)
+        //Update max index
+        curr_MACD_Max_Idx += 1
+        
+
+
+
+if macd_Histogram < 0       //MACD Negative
+
+    //Reset negative bar count
+    if bars_Neg < 1
+        prev_MACD_Max_Idx := curr_MACD_Max_Idx
+        
+    //Reset max price
+    prev_Price_Max := curr_Price_Max
+
+    //Update bar totals
+    bars_Pos := 0
+    bars_Neg += 1
+
+    //Update current mins
+    curr_MACD_Min := ta.lowest(macd_Histogram, bars_Neg)
+    curr_Price_Min := ta.lowest(low, bars_Neg)
+
+    //Detect if min and update min index
+    if ta.lowest(macd_Histogram[0], bars_Neg) < ta.lowest(macd_Histogram[1], bars_Neg)
+
+        curr_MACD_Min_Idx := 0
+     
+    else if ta.lowest(macd_Histogram[0], bars_Neg) > ta.lowest(macd_Histogram[1], bars_Neg)
+        //Update min index
+        curr_MACD_Min_Idx += 1
+        
+
+
+
+// Crossover Tests
+
+if macd_Histogram[0] >= 0 and macd_Histogram[1] < 0  
+//Test for Positive Crossover (For positive previous and current swaps)
+    
+    div_Nreg_Prev := line.copy(div_Nreg)
+    div_Nhid_Prev := line.copy(div_Nhid)
+    
+    prev_MACD_Min := curr_MACD_Min
+    
+    curr_MACD_Min_Idx := 0
+    
+    
+else if (macd_Histogram[0] < 0 and macd_Histogram[1] <= 0)                                      
+// Test for Negative Crossover (For negative previous and current swaps)
+
+    div_Preg_Prev := line.copy(div_Preg)
+    div_Phid_Prev := line.copy(div_Phid)
+    
+    prev_MACD_Max := curr_MACD_Max
+    
+    curr_MACD_Max_Idx := 0
+    
+
+
+// Index Incrementors
+
+prev_MACD_Max_Idx += 1
+prev_MACD_Min_Idx += 1
+
+                                                                                                
+                         //Divergence Calculation and Line Plotting
+
+
+//Positive Divergence (Bearish)
+
+
+if curr_MACD_Max < prev_MACD_Max and curr_Price_Max > prev_Price_Max                                       
+// Regular Divergence
+
+    line.set_xy1(div_Preg, x=bar_index[prev_MACD_Max_Idx], y=macd_Histogram[prev_MACD_Max_Idx])
+    line.set_xy2(div_Preg, x=bar_index[curr_MACD_Max_Idx], y=macd_Histogram[curr_MACD_Max_Idx])
+    line.set_color(div_Preg,  color = color.red)
+    line.set_width(div_Preg,  width = 2)
+    line.set_style(div_Preg,  style = line.style_solid)
+    
+else if (curr_MACD_Max > prev_MACD_Max) and (curr_Price_Max < prev_Price_Max)                               
+// Hidden Divergence
+
+    line.set_xy1(div_Phid, x=bar_index[prev_MACD_Max_Idx], y=macd_Histogram[prev_MACD_Max_Idx])
+    line.set_xy2(div_Phid, x=bar_index[curr_MACD_Max_Idx], y=macd_Histogram[curr_MACD_Max_Idx])
+    line.set_color(div_Phid,  color = color.red)
+    line.set_width(div_Phid,  width = 2)
+    line.set_style(div_Phid,  style = line.style_dotted)
+    
+else if curr_MACD_Max > prev_MACD_Max and curr_Price_Max > prev_Price_Max                                   
+//Invalidation Reset
+    
+    line.set_xy1(div_Phid, x=bar_index[0], y=0.001)
+    line.set_xy2(div_Phid, x=bar_index[0], y=0.001)
+    
+    line.set_xy1(div_Preg, x=bar_index[0], y=0.001)
+    line.set_xy2(div_Preg, x=bar_index[0], y=0.001)
+
+
+
+//Negative Divergence (Bullish)
+
+if curr_MACD_Min > prev_MACD_Min and curr_Price_Min < prev_Price_Min                                        
+// Regular Divergence
+    
+    line.set_xy1(div_Nreg, x=bar_index[prev_MACD_Min_Idx], y=macd_Histogram[prev_MACD_Min_Idx])
+    line.set_xy2(div_Nreg, x=bar_index[curr_MACD_Min_Idx], y=macd_Histogram[curr_MACD_Min_Idx])
+    line.set_color(div_Nreg,  color = color.green)
+    line.set_width(div_Nreg,  width = 2)
+    line.set_style(div_Nreg,  style = line.style_solid)
+
+else if curr_MACD_Min < prev_MACD_Min and curr_Price_Min > prev_Price_Min                                   
+// Hidden Divergence
+    
+    line.set_xy1(div_Nhid, x=bar_index[prev_MACD_Min_Idx], y=macd_Histogram[prev_MACD_Min_Idx])
+    line.set_xy2(div_Nhid, x=bar_index[curr_MACD_Min_Idx], y=macd_Histogram[curr_MACD_Min_Idx])
+    line.set_color(div_Nhid,  color = color.green)
+    line.set_width(div_Nhid,  width = 2)
+    line.set_style(div_Nhid,  style = line.style_dotted)
+    
+else if (curr_MACD_Min < prev_MACD_Min and curr_Price_Min < prev_Price_Min)                                 
+//Invalidation Reset
+    
+    line.set_xy1(div_Nhid, x=bar_index[0], y=0.001)
+    line.set_xy2(div_Nhid, x=bar_index[0], y=0.001)
+    
+    line.set_xy1(div_Nreg, x=bar_index[0], y=0.001)
+    line.set_xy2(div_Nreg, x=bar_index[0], y=0.001)
+
+
+
